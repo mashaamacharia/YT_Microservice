@@ -1,0 +1,79 @@
+# ─────────────────────────────────────────────────────────────
+# YouTube Pipeline — LLM Service
+# docker-compose.yml
+# ─────────────────────────────────────────────────────────────
+#
+# Commands:
+#   Start:    docker compose up -d --build
+#   Stop:     docker compose down
+#   Logs:     docker compose logs -f llm-service
+#   Restart:  docker compose restart llm-service
+#   Rebuild:  docker compose up -d --build --force-recreate
+#   Status:   docker compose ps
+# ─────────────────────────────────────────────────────────────
+
+services:
+  llm-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Use builder cache — only reinstalls deps if
+      # requirements.txt changes, not on every code change
+      cache_from:
+        - llm-service:latest
+
+    image: llm-service:latest
+    container_name: youtube-llm-service
+
+    # Map container port 8001 → host port 8001
+    # n8n calls http://localhost:8001 from WSL2 host
+    ports:
+      - "8001:8001"
+
+    # Load .env file — keys never baked into image
+    # .env must exist before running docker compose up
+    env_file:
+      - .env
+
+    # Restart policy:
+    # unless-stopped = restarts on crash or reboot
+    # but NOT when you manually docker compose down
+    restart: unless-stopped
+
+    # Docker-level health check
+    # Complements the HEALTHCHECK in Dockerfile
+    # docker compose ps shows health status
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+    # Resource limits
+    # Prevents the service from consuming all WSL2 memory
+    # if something goes wrong (e.g. infinite retry loop)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+
+    # Logging — keep logs manageable
+    # max-size: rotate when log file hits 10MB
+    # max-file: keep last 3 rotated files
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Volumes — none needed
+    # Service is stateless (no DB, no file writes)
+    # All state lives in .env and the LLM providers
+
+    # Network — default bridge network
+    # n8n on the same WSL2 host reaches it via localhost:8001

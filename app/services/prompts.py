@@ -156,7 +156,11 @@ Craft this script with the following in mind:
 
 Scene writing rules:
 - Minimum 20 scenes, maximum 30 scenes
-- Each scene is 8-18 seconds of narration
+- Scene duration by type:
+  * HOOK scenes: 6-10 seconds (fast cuts = urgency)
+  * Body/buildup scenes: 8-14 seconds (moderate pace)
+  * CLIMAX scene: 6-10 seconds (shortest cuts = maximum intensity)
+  * ENDING scene: 12-18 seconds (slowest cut = reflection)
 - Total duration of all scenes must sum to exactly 270-330 seconds
 - Scene 1: is_hook=true, clip_marker=HOOK — most shocking moment
 - The single most dramatic/intense scene: clip_marker=CLIMAX

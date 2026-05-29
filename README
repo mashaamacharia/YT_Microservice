@@ -1,0 +1,155 @@
+# YouTube Pipeline — LLM Service
+
+Centralized FastAPI microservice that handles all LLM calls
+for the YouTube automation pipeline. Supports Anthropic, OpenAI,
+and Gemini with automatic fallback.
+
+---
+
+## Setup
+
+### 1. Clone and enter the directory
+```bash
+cd llm-service
+```
+
+### 2. Create your .env file
+```bash
+cp .env.example .env
+```
+
+Open `.env` and add at least one API key:
+```bash
+# Add whichever key(s) you currently have
+OPENAI_API_KEY=sk-your-key-here
+# ANTHROPIC_API_KEY=
+# GEMINI_API_KEY=
+```
+
+### 3. Build and start
+```bash
+docker compose up -d --build
+```
+
+### 4. Verify it's running
+```bash
+# Health check
+curl http://localhost:8001/health
+
+# Full status — shows which providers are active
+curl http://localhost:8001/status
+```
+
+---
+
+## Endpoints
+
+| Method | Path | Phase | Description |
+|--------|------|-------|-------------|
+| POST | `/api/v1/research/aggregate` | Phase 2 | YouTube + Reddit → 5 video ideas |
+| POST | `/api/v1/script/generate` | Phase 4 | Topic → full 5-min script |
+| POST | `/api/v1/analytics/interpret` | Phase 13 | Metrics → performance grade + recommendations |
+| POST | `/api/v1/keywords/broaden` | Phase 7 | Failed keyword → 3 alternatives |
+| GET | `/health` | — | Docker healthcheck |
+| GET | `/status` | — | Provider status + config |
+| GET | `/docs` | — | Swagger UI (development only) |
+
+---
+
+## Adding a new API key
+
+No code changes needed. Just update `.env` and restart:
+
+```bash
+# Add key to .env
+ANTHROPIC_API_KEY=sk-ant-your-new-key
+
+# Update provider order to make it primary
+LLM_PROVIDER_ORDER=anthropic,openai,gemini
+
+# Restart service — picks up new .env automatically
+docker compose restart llm-service
+
+# Verify
+curl http://localhost:8001/status
+```
+
+---
+
+## Useful commands
+
+```bash
+# Start
+docker compose up -d --build
+
+# Stop
+docker compose down
+
+# Live logs
+docker compose logs -f llm-service
+
+# Restart after .env change
+docker compose restart llm-service
+
+# Full rebuild (after code changes)
+docker compose up -d --build --force-recreate
+
+# Check health
+docker compose ps
+
+# Shell into container (debugging)
+docker compose exec llm-service /bin/sh
+```
+
+---
+
+## n8n HTTP Request node configuration
+
+All four endpoints follow the same pattern in n8n:
+
+```
+Method:           POST
+URL:              http://localhost:8001/api/v1/{endpoint}
+Authentication:   None
+Body Content-Type: JSON
+Send Body:        JSON
+```
+
+Example for script generation:
+```json
+{
+  "topic": "{{ $json.chosen_topic }}",
+  "regenerate": false
+}
+```
+
+---
+
+## File structure
+
+```
+llm-service/
+├── .env                  ← your real keys (gitignored)
+├── .env.example          ← template (safe to commit)
+├── .gitignore
+├── .dockerignore
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── app/
+    ├── main.py           ← FastAPI app + /health + /status
+    ├── config.py         ← loads .env, helper methods
+    ├── routers/
+    │   ├── research.py   ← POST /api/v1/research/aggregate
+    │   ├── script.py     ← POST /api/v1/script/generate
+    │   ├── analytics.py  ← POST /api/v1/analytics/interpret
+    │   └── keywords.py   ← POST /api/v1/keywords/broaden
+    ├── services/
+    │   ├── provider_router.py  ← LLM routing + fallback
+    │   └── prompts.py          ← all prompt strings
+    └── models/
+        ├── research.py   ← Pydantic request/response models
+        ├── script.py     ← Pydantic request/response models
+        ├── analytics.py  ← Pydantic request/response models
+        └── keywords.py   ← Pydantic request/response models
+```
